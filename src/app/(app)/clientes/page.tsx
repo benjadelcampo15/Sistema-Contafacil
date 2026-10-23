@@ -80,7 +80,7 @@ export default async function ClientesPage({ searchParams }: PageProps<"/cliente
           return (
             <article
               key={c.id}
-              className="group flex flex-col rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md"
+              className="group relative flex cursor-pointer flex-col rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md"
             >
               <div className="flex items-start gap-4 p-5">
                 <div
@@ -91,7 +91,7 @@ export default async function ClientesPage({ searchParams }: PageProps<"/cliente
                 <div className="min-w-0 flex-1">
                   <Link
                     href={`/clientes/${c.id}`}
-                    className="block truncate text-lg font-semibold text-slate-900 group-hover:text-indigo-700"
+                    className="block truncate text-lg font-semibold text-slate-900 group-hover:text-indigo-700 after:absolute after:inset-0 after:rounded-2xl after:content-['']"
                   >
                     {c.razonSocial}
                   </Link>
@@ -127,7 +127,7 @@ export default async function ClientesPage({ searchParams }: PageProps<"/cliente
                 </div>
               </dl>
 
-              <div className="mt-auto flex gap-2 border-t border-slate-100 p-4">
+              <div className="relative z-10 mt-auto flex gap-2 border-t border-slate-100 p-4">
                 <Link href={`/clientes/${c.id}`} className="btn-secondary flex-1">Ver ficha</Link>
                 {estado.lista ? (
                   <Link href={`/clientes/${c.id}#facturar`} className="btn flex-1">Facturar</Link>
