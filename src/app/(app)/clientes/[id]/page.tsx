@@ -50,6 +50,7 @@ export default async function ClientePage({ params }: PageProps<"/clientes/[id]"
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href={`/clientes/${cliente.id}/editar`} className="btn-secondary">Editar</Link>
+          <Link href={`/clientes/${cliente.id}/lote`} className="btn-secondary">Facturar desde Excel</Link>
           <Link href={`/clientes/${cliente.id}/facturar`} className="btn">Nueva factura</Link>
         </div>
       </div>

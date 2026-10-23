@@ -33,7 +33,10 @@ export default async function FacturarPage({ params, searchParams }: PageProps<"
         </Link>
         <h1 className="h1">Nuevo comprobante</h1>
         <p className="text-sm text-slate-600">
-          Emisor: {cliente.razonSocial} · CUIT {cuit(cliente.cuit)}
+          Emisor: {cliente.razonSocial} · CUIT {cuit(cliente.cuit)} ·{" "}
+          <Link href={`/clientes/${cliente.id}/lote`} className="text-indigo-600 hover:underline">
+            ¿Muchas facturas? Cargalas desde Excel
+          </Link>
         </p>
       </div>
 
