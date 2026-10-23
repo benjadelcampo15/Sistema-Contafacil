@@ -1,8 +1,7 @@
 import { contadorOpcional } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { generarPdf } from "@/lib/pdf";
-import { numeroComprobante } from "@/lib/format";
-import { TIPOS_COMPROBANTE } from "@/lib/arca/constants";
+import { nombreArchivoComprobante } from "@/lib/filtros-comprobantes";
 
 export async function GET(req: Request, ctx: RouteContext<"/api/comprobantes/[id]/pdf">) {
   const contador = await contadorOpcional();
@@ -16,10 +15,7 @@ export async function GET(req: Request, ctx: RouteContext<"/api/comprobantes/[id
   if (!c) return new Response("Comprobante no encontrado", { status: 404 });
 
   const bytes = await generarPdf(c);
-  const nombre =
-    `${TIPOS_COMPROBANTE[c.tipo].nombre}_${numeroComprobante(c.puntoVenta.numero, c.numero)}_${c.cliente.razonSocial}`
-      .normalize("NFD")
-      .replace(/[^\w-]+/g, "_") + ".pdf";
+  const nombre = nombreArchivoComprobante(c);
   const descargar = new URL(req.url).searchParams.has("descargar");
   return new Response(Buffer.from(bytes), {
     headers: {
