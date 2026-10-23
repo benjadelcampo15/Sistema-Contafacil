@@ -1,0 +1,171 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Ambiente {
+  HOMOLOGACION
+  PRODUCCION
+}
+
+enum CondicionIva {
+  RESPONSABLE_INSCRIPTO
+  MONOTRIBUTO
+  EXENTO
+}
+
+enum EstadoComprobante {
+  PENDIENTE // guardado localmente, enviado (o por enviar) a ARCA sin respuesta confirmada
+  AUTORIZADO
+  RECHAZADO
+}
+
+/// El contador (o estudio contable). Es quien tiene el certificado de ARCA;
+/// cada cliente le delega el servicio "wsfe" desde el Administrador de Relaciones.
+model Contador {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  nombre       String
+  cuit         String? // CUIT del contador (titular del certificado)
+  ambiente     Ambiente @default(HOMOLOGACION)
+  certPem      String? // certificado X.509 emitido por ARCA
+  keyEnc       String? // clave privada cifrada con APP_SECRET (AES-256-GCM)
+  createdAt    DateTime @default(now())
+
+  clientes Cliente[]
+  tokens   TokenArca[]
+}
+
+/// Ticket de acceso de WSAA cacheado (dura ~12 hs y ARCA no permite pedir otro mientras sea válido).
+model TokenArca {
+  id         String   @id @default(cuid())
+  contadorId String
+  titular    String   @default("") // CUIT dueño del certificado ("" = certificado del contador)
+  servicio   String
+  ambiente   Ambiente
+  token      String
+  sign       String
+  expiresAt  DateTime
+
+  contador Contador @relation(fields: [contadorId], references: [id], onDelete: Cascade)
+
+  @@unique([contadorId, titular, servicio, ambiente])
+}
+
+/// Cliente del contador: el contribuyente que emite las facturas.
+model Cliente {
+  id                String       @id @default(cuid())
+  contadorId        String
+  razonSocial       String
+  nombreFantasia    String?
+  cuit              String
+  condicionIva      CondicionIva
+  domicilio         String
+  iibb              String?
+  inicioActividades DateTime?
+  email             String?
+  activo            Boolean      @default(true)
+  // Certificado propio del cliente (alternativa a la delegación al contador)
+  certPem           String?
+  keyEnc            String?
+  arcaVerificadoAt  DateTime? // última vez que la conexión con ARCA (WSAA + WSFE) respondió OK
+  createdAt         DateTime     @default(now())
+
+  contador     Contador      @relation(fields: [contadorId], references: [id], onDelete: Cascade)
+  puntosVenta  PuntoVenta[]
+  receptores   Receptor[]
+  comprobantes Comprobante[]
+
+  @@unique([contadorId, cuit])
+}
+
+model PuntoVenta {
+  id          String  @id @default(cuid())
+  clienteId   String
+  numero      Int
+  descripcion String?
+
+  cliente      Cliente       @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  comprobantes Comprobante[]
+
+  @@unique([clienteId, numero])
+}
+
+/// Agenda de compradores de cada cliente (para no tipear los datos cada vez).
+model Receptor {
+  id             String  @id @default(cuid())
+  clienteId      String
+  docTipo        Int // 80 CUIT, 86 CUIL, 96 DNI, 99 Consumidor Final
+  docNro         String
+  razonSocial    String
+  condicionIvaId Int // códigos de ARCA (1 RI, 4 Exento, 5 CF, 6 Monotributo, ...)
+  domicilio      String?
+  email          String?
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@unique([clienteId, docTipo, docNro])
+}
+
+model Comprobante {
+  id           String            @id @default(cuid())
+  clienteId    String
+  puntoVentaId String
+  tipo         Int // código ARCA: 1 FA, 6 FB, 11 FC, 3/8/13 NC, 2/7/12 ND
+  numero       Int? // null si ARCA lo rechazó (el número no se consume)
+  fecha        DateTime          @db.Date
+  concepto     Int // 1 Productos, 2 Servicios, 3 Productos y Servicios
+  fchServDesde DateTime?         @db.Date
+  fchServHasta DateTime?         @db.Date
+  fchVtoPago   DateTime?         @db.Date
+  estado       EstadoComprobante @default(PENDIENTE)
+
+  // Receptor (copiado al momento de emitir)
+  docTipo           Int
+  docNro            String
+  receptorNombre    String
+  receptorDomicilio String?
+  receptorCondIvaId Int
+
+  moneda     String  @default("PES")
+  cotizacion Decimal @default(1) @db.Decimal(14, 6)
+  impNeto    Decimal @db.Decimal(14, 2)
+  impIva     Decimal @db.Decimal(14, 2)
+  impExento  Decimal @default(0) @db.Decimal(14, 2)
+  impTotal   Decimal @db.Decimal(14, 2)
+
+  // Comprobante asociado (obligatorio para notas de crédito/débito)
+  asociadoId String?
+
+  cae           String?
+  caeVto        DateTime? @db.Date
+  observaciones Json? // errores/observaciones devueltos por ARCA
+  createdAt     DateTime  @default(now())
+
+  cliente    Cliente           @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  puntoVenta PuntoVenta        @relation(fields: [puntoVentaId], references: [id])
+  asociado   Comprobante?      @relation("Asociados", fields: [asociadoId], references: [id])
+  asociadas  Comprobante[]     @relation("Asociados")
+  items      ComprobanteItem[]
+
+  @@unique([puntoVentaId, tipo, numero])
+  @@index([clienteId, fecha])
+}
+
+model ComprobanteItem {
+  id             String  @id @default(cuid())
+  comprobanteId  String
+  descripcion    String
+  cantidad       Decimal @db.Decimal(14, 4)
+  precioUnitario Decimal @db.Decimal(14, 4) // sin IVA para A/B, final para C
+  alicuotaIvaId  Int? // 3=0%, 4=10.5%, 5=21%, 6=27%, 8=5%, 9=2.5% (null en Factura C)
+  subtotal       Decimal @db.Decimal(14, 2) // neto
+  iva            Decimal @db.Decimal(14, 2)
+
+  comprobante Comprobante @relation(fields: [comprobanteId], references: [id], onDelete: Cascade)
+}
