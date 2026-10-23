@@ -17,12 +17,24 @@ export async function login(_: AuthState, form: FormData): Promise<AuthState> {
   const parsed = loginSchema.safeParse(Object.fromEntries(form));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const contador = await db.contador.findUnique({ where: { email: parsed.data.email } });
-  if (!contador || !(await bcrypt.compare(parsed.data.password, contador.passwordHash))) {
-    return { error: "Email o contraseña incorrectos" };
+  try {
+    const contador = await db.contador.findUnique({ where: { email: parsed.data.email } });
+    if (!contador || !(await bcrypt.compare(parsed.data.password, contador.passwordHash))) {
+      return { error: "Email o contraseña incorrectos" };
+    }
+    await crearSesion(contador.id);
+  } catch (e) {
+    return errorServidor(e);
   }
-  await crearSesion(contador.id);
   redirect("/clientes");
+}
+
+/** Error inesperado (base caída, variables de entorno faltantes): mensaje entendible en vez de la pantalla de error. */
+function errorServidor(e: unknown): AuthState {
+  console.error("[auth]", e);
+  const msg = e instanceof Error ? e.message : "";
+  if (msg.includes("APP_SECRET")) return { error: "Error de configuración del servidor: falta APP_SECRET. Revisá /api/salud." };
+  return { error: "No se pudo conectar con el servidor o la base de datos. Revisá /api/salud." };
 }
 
 const registroSchema = z.object({
@@ -35,18 +47,22 @@ export async function registro(_: AuthState, form: FormData): Promise<AuthState>
   const parsed = registroSchema.safeParse(Object.fromEntries(form));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  if (await db.contador.findUnique({ where: { email: parsed.data.email } })) {
-    return { error: "Ya existe una cuenta con ese email" };
+  try {
+    if (await db.contador.findUnique({ where: { email: parsed.data.email } })) {
+      return { error: "Ya existe una cuenta con ese email" };
+    }
+    const contador = await db.contador.create({
+      data: {
+        nombre: parsed.data.nombre,
+        email: parsed.data.email,
+        passwordHash: await bcrypt.hash(parsed.data.password, 10),
+      },
+    });
+    await crearSesion(contador.id);
+  } catch (e) {
+    return errorServidor(e);
   }
-  const contador = await db.contador.create({
-    data: {
-      nombre: parsed.data.nombre,
-      email: parsed.data.email,
-      passwordHash: await bcrypt.hash(parsed.data.password, 10),
-    },
-  });
-  await crearSesion(contador.id);
-  redirect("/configuracion");
+  redirect("/clientes");
 }
 
 export async function logout() {
