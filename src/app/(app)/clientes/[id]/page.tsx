@@ -38,6 +38,8 @@ export default async function ClientePage({ params }: PageProps<"/clientes/[id]"
     cert = null;
   }
 
+  const listo = Boolean(cert && cliente.arcaVerificadoAt && cliente.puntosVenta.length);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -48,19 +50,37 @@ export default async function ClientePage({ params }: PageProps<"/clientes/[id]"
             CUIT {cuit(cliente.cuit)} · {CONDICION[cliente.condicionIva]} · {cliente.domicilio}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href={`/clientes/${cliente.id}/editar`} className="btn-secondary">Editar</Link>
-          <Link href={`/clientes/${cliente.id}/lote`} className="btn-secondary">Facturar desde Excel</Link>
-          <Link href={`/clientes/${cliente.id}/facturar`} className="btn">Nueva factura</Link>
-        </div>
+        <Link href={`/clientes/${cliente.id}/editar`} className="btn-secondary">Editar datos</Link>
       </div>
 
-      <details className="card group" open={!(cert && cliente.arcaVerificadoAt && cliente.puntosVenta.length)}>
+      <section id="facturar" className="scroll-mt-24">
+        <h2 className="h2 mb-3">Facturar</h2>
+        {listo ? (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <OpcionFacturar
+              href={`/clientes/${cliente.id}/facturar`}
+              icono="🧾"
+              titulo="Una factura"
+              texto="Cargás los datos del comprador y los ítems, y la emitís al instante."
+            />
+            <OpcionFacturar
+              href={`/clientes/${cliente.id}/lote`}
+              icono="📊"
+              titulo="Varias desde Excel"
+              texto="Subís una planilla con muchas facturas, las revisás y se emiten todas juntas."
+            />
+          </div>
+        ) : (
+          <p className="card text-sm text-amber-900">
+            Para poder facturar, primero completá la <strong>Conexión con ARCA</strong> de abajo.
+          </p>
+        )}
+      </section>
+
+      <details className="card group" open={!listo}>
         <summary className="h2 cursor-pointer list-none">
           Conexión con ARCA{" "}
-          <span className="text-sm font-normal text-slate-500">
-            {cert && cliente.arcaVerificadoAt && cliente.puntosVenta.length ? "· conectada" : "· pendiente"}
-          </span>
+          <span className="text-sm font-normal text-slate-500">{listo ? "· conectada" : "· pendiente"}</span>
         </summary>
         <div className="mt-4">
           <ConexionArca
@@ -148,5 +168,20 @@ export default async function ClientePage({ params }: PageProps<"/clientes/[id]"
         </table>
       </section>
     </div>
+  );
+}
+
+function OpcionFacturar(props: { href: string; icono: string; titulo: string; texto: string }) {
+  return (
+    <Link
+      href={props.href}
+      className="group flex items-start gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md"
+    >
+      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-2xl">{props.icono}</span>
+      <span className="min-w-0">
+        <span className="block text-lg font-semibold text-slate-900 group-hover:text-indigo-700">{props.titulo} →</span>
+        <span className="mt-0.5 block text-sm text-slate-600">{props.texto}</span>
+      </span>
+    </Link>
   );
 }

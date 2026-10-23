@@ -130,7 +130,7 @@ export default async function ClientesPage({ searchParams }: PageProps<"/cliente
               <div className="mt-auto flex gap-2 border-t border-slate-100 p-4">
                 <Link href={`/clientes/${c.id}`} className="btn-secondary flex-1">Ver ficha</Link>
                 {estado.lista ? (
-                  <Link href={`/clientes/${c.id}/facturar`} className="btn flex-1">Facturar</Link>
+                  <Link href={`/clientes/${c.id}#facturar`} className="btn flex-1">Facturar</Link>
                 ) : (
                   <Link href={`/clientes/${c.id}`} className="btn flex-1 bg-amber-500 hover:bg-amber-600">
                     Completar conexión
