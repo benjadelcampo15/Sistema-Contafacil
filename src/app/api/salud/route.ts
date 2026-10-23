@@ -19,9 +19,12 @@ export async function GET() {
     APP_SECRET: !secret ? "FALTA" : secret.length < 32 ? `muy corto (${secret.length} caracteres, mínimo 32)` : "ok",
     DATABASE_URL: !dbUrl
       ? "FALTA"
-      : /^postgres(ql)?:\/\//.test(dbUrl)
-        ? "ok"
-        : "formato inválido (tiene que empezar con postgresql://; ¿quedaron comillas o espacios?)",
+      : !/^postgres(ql)?:\/\//.test(dbUrl)
+        ? "formato inválido (tiene que empezar con postgresql://; ¿quedaron comillas o espacios?)"
+        : dbUrl.includes("pooler.supabase.com") && !dbUrl.includes("pgbouncer=true")
+          ? "usá el Transaction pooler (puerto 6543 con ?pgbouncer=true&connection_limit=1): el Session pooler se queda sin conexiones en Vercel"
+          : "ok",
+    DIRECT_URL: process.env.DIRECT_URL ? "ok" : "FALTA",
     baseDeDatos,
   };
   const ok = Object.values(estado).every((v) => v === "ok");
